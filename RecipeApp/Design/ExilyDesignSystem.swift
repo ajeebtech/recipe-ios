@@ -172,15 +172,22 @@ struct ExilySegmentedControl<T: Hashable>: View {
     @Binding var selection: T
     let options: [T]
     let label: (T) -> String
+    var compact: Bool = false
 
-    init(selection: Binding<T>, options: [T], label: @escaping (T) -> String) {
+    init(
+        selection: Binding<T>,
+        options: [T],
+        compact: Bool = false,
+        label: @escaping (T) -> String
+    ) {
         _selection = selection
         self.options = options
+        self.compact = compact
         self.label = label
     }
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: compact ? 6 : 8) {
             ForEach(options, id: \.self) { option in
                 Button {
                     ExilyHaptics.tap(.select)
@@ -189,16 +196,16 @@ struct ExilySegmentedControl<T: Hashable>: View {
                     }
                 } label: {
                     Text(label(option).lowercased())
-                        .font(.appFont(size: 13, weight: .bold))
+                        .font(.appFont(size: compact ? 11 : 13, weight: .bold))
                         .foregroundColor(selection == option ? .white : ExilyColors.textPrimary)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 38)
+                        .frame(height: compact ? 30 : 38)
                         .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: compact ? 9 : 12, style: .continuous)
                                 .fill(selection == option ? ExilyColors.accentBlue : ExilyColors.surfaceMuted)
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: compact ? 9 : 12, style: .continuous)
                                 .stroke(
                                     selection == option
                                         ? ExilyColors.accentBlue.opacity(0.3)
@@ -215,15 +222,16 @@ struct ExilySegmentedControl<T: Hashable>: View {
 
 struct TactileButtonStyle: ButtonStyle {
     var isActive: Bool
+    var compact: Bool = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.appFont(size: 15, weight: .bold))
+            .font(.appFont(size: compact ? 13 : 15, weight: .bold))
             .foregroundColor(isActive ? .white : .black)
-            .padding(.vertical, 14)
+            .padding(.vertical, compact ? 9 : 14)
             .frame(maxWidth: .infinity)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: compact ? 10 : 14, style: .continuous)
                     .fill(isActive ? ExilyColors.accentBlue : ExilyColors.surfaceMuted)
             )
             .overlay(

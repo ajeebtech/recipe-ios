@@ -6,24 +6,41 @@ struct RecipeArtifactView: View {
 
     @State private var viewMode: RecipeViewMode = .diagram
     @State private var unitDisplay: UnitDisplay = .both
+    private let parsed: ParsedRecipe
 
-    private var parsed: ParsedRecipe { document.parsed }
+    init(document: RecipeDocument) {
+        self.document = document
+        parsed = document.parsed
+    }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    masthead
-                    controls
-                    if let error = parsed.error {
-                        errorBanner(error)
+            GeometryReader { proxy in
+                let width = max(proxy.size.width, 1)
+                let height = max(proxy.size.height, 1)
+                let size = CGSize(width: width, height: height)
+
+                HStack(alignment: .top, spacing: 24) {
+                    sidebar
+                        .frame(width: min(240, width * 0.28), alignment: .topLeading)
+                        .frame(maxHeight: .infinity, alignment: .top)
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            if let error = parsed.error {
+                                errorBanner(error)
+                            }
+                            artifactCard(width: diagramWidth(in: size))
+                            footerNote
+                        }
+                        .padding(.bottom, 24)
                     }
-                    artifactCard
-                    footerNote
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-                .padding(.bottom, 40)
+                .padding(.bottom, 16)
+                .frame(width: width, height: height, alignment: .topLeading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(ExilyColors.background.ignoresSafeArea())
@@ -34,41 +51,60 @@ struct RecipeArtifactView: View {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(ExilyColors.textPrimary)
-                            .frame(width: 40, height: 40)
+                            .frame(width: 36, height: 36)
+                            .background(ExilyColors.surfaceMuted, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(ExilyColors.border, lineWidth: 1)
+                            }
                     }
-                    .buttonStyle(Raised3DButtonStyle(cornerRadius: 12, isDark: false, hapticStrength: .action))
+                    .buttonStyle(.plain)
                 }
             }
         }
+        .landscapeReveal()
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            masthead
+            controls
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private func diagramWidth(in size: CGSize) -> CGFloat {
+        let width = max(size.width, 1)
+        let sidebarWidth = min(240, width * 0.28)
+        return max(width - sidebarWidth - 56, 1)
     }
 
     private var masthead: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    ExilyChip(text: "recipe artifact")
-                    Text((parsed.meta.title.isEmpty ? document.title : parsed.meta.title).lowercased())
-                        .font(.appFont(size: 24, weight: .bold))
-                        .foregroundColor(ExilyColors.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 12)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            Text((parsed.meta.title.isEmpty ? document.title : parsed.meta.title).lowercased())
+                .font(.appFont(size: 20, weight: .bold))
+                .foregroundColor(ExilyColors.textPrimary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
-            if !metaParts.isEmpty {
-                HStack(spacing: 8) {
-                    ForEach(Array(metaParts.enumerated()), id: \.offset) { _, part in
-                        ExilyChip(text: "\(part.0.lowercased()) · \(part.1.lowercased())")
-                    }
-                }
+            if !metaLine.isEmpty {
+                Text(metaLine)
+                    .font(.appFont(size: 11, weight: .medium))
+                    .foregroundColor(ExilyColors.textSecondary)
+                    .lineLimit(2)
             }
 
             ExilySegmentedControl(
                 selection: $viewMode,
                 options: RecipeViewMode.allCases,
+                compact: true,
                 label: { $0.rawValue }
             )
         }
+    }
+
+    private var metaLine: String {
+        metaParts.map { "\($0.0.lowercased()) · \($0.1.lowercased())" }.joined(separator: " · ")
     }
 
     private var metaParts: [(String, String)] {
@@ -80,36 +116,39 @@ struct RecipeArtifactView: View {
     }
 
     private var controls: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("units")
-                .font(.appFont(size: 14, weight: .semibold))
-                .foregroundColor(ExilyColors.textPrimary)
-
+        VStack(alignment: .leading, spacing: 8) {
             ExilySegmentedControl(
                 selection: $unitDisplay,
                 options: UnitDisplay.allCases,
+                compact: true,
                 label: { $0.rawValue }
             )
 
             Button {} label: {
                 Text("cook this")
             }
-            .buttonStyle(TactileButtonStyle(isActive: true))
+            .buttonStyle(TactileButtonStyle(isActive: true, compact: true))
         }
     }
 
-    private var artifactCard: some View {
+    private func artifactCard(width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Group {
                 switch viewMode {
                 case .diagram:
-                    RecipeDiagramView(recipe: parsed, units: unitDisplay)
+                    RecipeDiagramView(
+                        recipe: parsed,
+                        units: unitDisplay,
+                        availableWidth: max(width - 40, 1)
+                    )
                 case .recipe:
                     RecipeProseView(recipe: parsed)
                 }
             }
             .padding(20)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .clipped()
         .background(ArtifactColors.card)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(

@@ -12,12 +12,14 @@ enum MockRecipeData {
                     id: "pancakes",
                     title: "Buttermilk Pancakes",
                     subtitle: "12 pancakes · griddle",
+                    prepTime: "15 min",
                     source: pancakesSource
                 ),
                 RecipeDocument(
                     id: "cornbread",
                     title: "Skillet Cornbread",
                     subtitle: "8 wedges · cast iron",
+                    prepTime: "35 min",
                     source: cornbreadSource
                 )
             ]
@@ -32,6 +34,7 @@ enum MockRecipeData {
                     id: "focaccia",
                     title: "Overnight Focaccia",
                     subtitle: "12 pieces · sheet pan",
+                    prepTime: "overnight",
                     source: focacciaSource
                 )
             ]
@@ -46,6 +49,7 @@ enum MockRecipeData {
                     id: "brownies",
                     title: "Espresso Brownies",
                     subtitle: "16 squares · 8×8 pan",
+                    prepTime: "45 min",
                     source: browniesSource
                 )
             ]
@@ -60,6 +64,7 @@ enum MockRecipeData {
                     id: "vinaigrette",
                     title: "Everyday Vinaigrette",
                     subtitle: "3/4 cup · jar",
+                    prepTime: "5 min",
                     source: vinaigretteSource
                 )
             ]
@@ -74,6 +79,7 @@ enum MockRecipeData {
                     id: "miso-soup",
                     title: "Miso Soup",
                     subtitle: "4 bowls · donabe",
+                    prepTime: "20 min",
                     source: misoSoupSource
                 )
             ]
@@ -88,6 +94,7 @@ enum MockRecipeData {
                     id: "salsa-verde",
                     title: "Salsa Verde",
                     subtitle: "2 cups · molcajete",
+                    prepTime: "25 min",
                     source: salsaVerdeSource
                 )
             ]
@@ -235,4 +242,148 @@ blend | until coarse-smooth
     1/2 tsp | 3 g | table salt
     2 Tbs | 30 mL | lime juice
 """
+
+    private struct BookRecipeSeed {
+        let title: String
+        let prepTime: String
+        let genre: RecipeGenre
+    }
+
+    static func bookRecipes(for folder: CuisineFolder) -> [RecipeDocument] {
+        guard !folder.recipes.isEmpty else { return [] }
+
+        return seeds(for: folder.id).enumerated().map { index, seed in
+            let template = folder.recipes[index % folder.recipes.count]
+            return RecipeDocument(
+                id: "\(folder.id)-book-\(index)",
+                title: seed.title,
+                subtitle: template.subtitle,
+                prepTime: seed.prepTime,
+                genre: seed.genre,
+                source: source(named: seed.title, from: template.source)
+            )
+        }
+    }
+
+    private static func seeds(for cuisineID: String) -> [BookRecipeSeed] {
+        switch cuisineID {
+        case "american":
+            return makeSeeds([
+                ("Breakfast", "sunrise.fill", [
+                    ("Buttermilk Pancakes", "15 min"), ("Blueberry Waffles", "25 min"),
+                    ("Hash Brown Skillet", "30 min"), ("Soft Scrambled Eggs", "10 min")
+                ]),
+                ("Mains", "fork.knife", [
+                    ("Buttermilk Fried Chicken", "1 hr"), ("Classic Cheeseburger", "35 min"),
+                    ("Meatloaf", "1 hr 20"), ("Pulled Pork", "6 hr")
+                ]),
+                ("Breads", "birthday.cake.fill", [
+                    ("Skillet Cornbread", "35 min"), ("Buttermilk Biscuits", "30 min"),
+                    ("Dinner Rolls", "2 hr"), ("Banana Bread", "1 hr")
+                ])
+            ])
+        case "italian":
+            return makeSeeds([
+                ("Pasta", "fork.knife", [
+                    ("Cacio e Pepe", "25 min"), ("Rigatoni Amatriciana", "40 min"),
+                    ("Pesto Genovese", "20 min"), ("Mushroom Tagliatelle", "45 min")
+                ]),
+                ("Mains", "frying.pan.fill", [
+                    ("Chicken Piccata", "35 min"), ("Eggplant Parmigiana", "1 hr"),
+                    ("Osso Buco", "3 hr"), ("Pollo al Mattone", "50 min")
+                ]),
+                ("Breads", "leaf.fill", [
+                    ("Overnight Focaccia", "overnight"), ("Rosemary Schiacciata", "3 hr"),
+                    ("Garlic Knots", "2 hr"), ("Ciabatta", "overnight")
+                ]),
+                ("Desserts", "birthday.cake.fill", [
+                    ("Tiramisu", "6 hr"), ("Panna Cotta", "4 hr"),
+                    ("Olive Oil Cake", "1 hr"), ("Affogato", "5 min")
+                ])
+            ])
+        case "desserts":
+            return makeSeeds([
+                ("Chocolate", "birthday.cake.fill", [
+                    ("Espresso Brownies", "45 min"), ("Flourless Chocolate Cake", "1 hr"),
+                    ("Chocolate Pots", "3 hr"), ("Dark Chocolate Tart", "2 hr")
+                ]),
+                ("Fruit", "apple.logo", [
+                    ("Apple Galette", "1 hr"), ("Lemon Bars", "50 min"),
+                    ("Berry Cobbler", "45 min"), ("Pear Crumble", "55 min")
+                ]),
+                ("Frozen", "snowflake", [
+                    ("Vanilla Bean Gelato", "6 hr"), ("Strawberry Semifreddo", "5 hr"),
+                    ("Chocolate Sorbet", "4 hr"), ("Lemon Granita", "3 hr")
+                ])
+            ])
+        case "basics":
+            return makeSeeds([
+                ("Sauces", "drop.fill", [
+                    ("Everyday Vinaigrette", "5 min"), ("Classic Mayonnaise", "10 min"),
+                    ("Green Goddess", "10 min"), ("Tomato Sauce", "45 min")
+                ]),
+                ("Stocks", "takeoutbag.and.cup.and.straw.fill", [
+                    ("Chicken Stock", "4 hr"), ("Vegetable Stock", "1 hr"),
+                    ("Quick Dashi", "20 min"), ("Mushroom Broth", "1 hr")
+                ]),
+                ("Doughs", "circle.grid.cross.fill", [
+                    ("Pizza Dough", "overnight"), ("Shortcrust Pastry", "1 hr"),
+                    ("Fresh Pasta", "45 min"), ("Pie Dough", "2 hr")
+                ])
+            ])
+        case "japanese":
+            return makeSeeds([
+                ("Soups", "takeoutbag.and.cup.and.straw.fill", [
+                    ("Miso Soup", "20 min"), ("Shoyu Ramen", "4 hr"),
+                    ("Tonjiru", "1 hr"), ("Clear Clam Soup", "25 min")
+                ]),
+                ("Rice", "circle.grid.cross.fill", [
+                    ("Chicken Donburi", "35 min"), ("Onigiri", "30 min"),
+                    ("Ochazuke", "10 min"), ("Mushroom Takikomi Gohan", "50 min")
+                ]),
+                ("Mains", "fish.fill", [
+                    ("Teriyaki Salmon", "30 min"), ("Chicken Katsu", "40 min"),
+                    ("Agedashi Tofu", "30 min"), ("Saba Shioyaki", "25 min")
+                ]),
+                ("Sides", "leaf.fill", [
+                    ("Goma-ae Spinach", "15 min"), ("Sunomono", "20 min"),
+                    ("Tamagoyaki", "15 min"), ("Edamame", "10 min")
+                ])
+            ])
+        default:
+            return makeSeeds([
+                ("Salsas", "flame.fill", [
+                    ("Salsa Verde", "25 min"), ("Roasted Tomato Salsa", "30 min"),
+                    ("Pico de Gallo", "15 min"), ("Chile de Árbol Salsa", "20 min")
+                ]),
+                ("Mains", "fork.knife", [
+                    ("Chicken Tinga", "1 hr"), ("Carnitas", "4 hr"),
+                    ("Chiles Rellenos", "1 hr"), ("Carne Asada", "45 min")
+                ]),
+                ("Antojitos", "takeoutbag.and.cup.and.straw.fill", [
+                    ("Elote", "25 min"), ("Quesadillas", "20 min"),
+                    ("Sopes", "1 hr"), ("Tostadas", "40 min")
+                ])
+            ])
+        }
+    }
+
+    private static func makeSeeds(
+        _ groups: [(String, String, [(String, String)])]
+    ) -> [BookRecipeSeed] {
+        groups.flatMap { name, symbol, recipes in
+            let genre = RecipeGenre(name, symbol: symbol)
+            return recipes.map {
+                BookRecipeSeed(title: $0.0, prepTime: $0.1, genre: genre)
+            }
+        }
+    }
+
+    private static func source(named title: String, from source: String) -> String {
+        source.replacingOccurrences(
+            of: #"(?m)^title:.*$"#,
+            with: "title: \(title)",
+            options: .regularExpression
+        )
+    }
 }

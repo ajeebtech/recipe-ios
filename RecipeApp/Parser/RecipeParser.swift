@@ -271,13 +271,18 @@ enum RecipeParser {
     }
 
     private static func assignColspan(root: RecipeNode) {
-        func walk(_ node: RecipeNode, depth: Int) {
-            if node.type == .ingredient || node.type == .reference {
-                node.colspan = max(1, depth - node.col + 1)
+        let columnCount = root.col + 1
+
+        func walk(_ node: RecipeNode) {
+            if let parent = node.parent {
+                node.colspan = max(1, parent.col - node.col)
+            } else {
+                node.colspan = max(1, columnCount - node.col)
             }
-            node.children.forEach { walk($0, depth: depth) }
+            node.children.forEach(walk)
         }
-        walk(root, depth: root.col)
+
+        walk(root)
     }
 }
 

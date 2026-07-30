@@ -11,9 +11,11 @@ private struct DiagramSizePreferenceKey: PreferenceKey {
 private extension View {
     func readDiagramSize(_ onChange: @escaping (CGSize) -> Void) -> some View {
         background {
-            GeometryReader { geo in
-                Color.clear
-                    .preference(key: DiagramSizePreferenceKey.self, value: geo.size)
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: DiagramSizePreferenceKey.self,
+                    value: proxy.size
+                )
             }
         }
         .onPreferenceChange(DiagramSizePreferenceKey.self, perform: onChange)
@@ -24,19 +26,19 @@ struct RecipeDiagramView: View {
     let recipe: ParsedRecipe
     var units: UnitDisplay = .both
     var scale: Double = 1
+    var availableWidth: CGFloat = 320
     @State private var highlightedID: String?
-    @State private var containerWidth: CGFloat = 0
     @State private var diagramSize: CGSize = .zero
 
-    private var rows: [DiagramRow] { RecipeParser.diagramRows(from: recipe) }
+    private let rowHeight: CGFloat = 58
 
     private var fitScale: CGFloat {
-        guard containerWidth > 0 else { return 1 }
-        return min(1, containerWidth / max(tableMinWidth, 1))
+        let width = max(availableWidth, 1)
+        return min(1, width / max(tableMinWidth, 1))
     }
 
     private var columnMetrics: (ingredient: CGFloat, operation: CGFloat) {
-        if containerWidth > 0, containerWidth < 520 {
+        if availableWidth < 520 {
             return (228, 78)
         }
         return (ArtifactMetrics.ingredientColumnWidth, ArtifactMetrics.operationColumnWidth)
@@ -50,24 +52,36 @@ struct RecipeDiagramView: View {
                 .kerning(0.4)
                 .padding(.bottom, 8)
 
-            diagramTable
-                .frame(width: tableMinWidth, alignment: .leading)
-                .readDiagramSize { diagramSize = $0 }
-                .scaleEffect(fitScale, anchor: .topLeading)
-                .frame(
-                    width: containerWidth > 0 ? containerWidth : nil,
-                    height: diagramSize.height * fitScale,
-                    alignment: .topLeading
-                )
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            GeometryReader { geo in
-                Color.clear
-                    .onAppear { containerWidth = geo.size.width }
-                    .onChange(of: geo.size.width) { _, width in containerWidth = width }
+            ZStack(alignment: .topLeading) {
+                diagramTable
+                    .frame(width: tableMinWidth, alignment: .leading)
+                    .fixedSize(horizontal: true, vertical: true)
+                    .hidden()
+                    .readDiagramSize { size in
+                        guard size != diagramSize else { return }
+                        diagramSize = size
+                    }
+
+                diagramTable
+                    .frame(width: tableMinWidth, alignment: .leading)
+                    .fixedSize(horizontal: true, vertical: true)
+                    .scaleEffect(fitScale, anchor: .topLeading)
             }
+            .frame(
+                width: max(availableWidth, 1),
+                height: layoutHeight,
+                alignment: .topLeading
+            )
+            .clipped()
         }
+        .frame(width: max(availableWidth, 1), alignment: .leading)
+    }
+
+    private var layoutHeight: CGFloat? {
+        guard diagramSize.height > 0 else { return nil }
+        let scaledHeight = diagramSize.height * fitScale
+        guard scaledHeight.isFinite, scaledHeight > 0 else { return nil }
+        return scaledHeight
     }
 
     private var diagramTable: some View {
@@ -76,9 +90,7 @@ struct RecipeDiagramView: View {
                 bannerRow(text: step, index: index + 1, isFinish: false)
             }
 
-            ForEach(rows) { row in
-                diagramDataRow(row)
-            }
+            diagramGrid
 
             ForEach(Array(recipe.meta.finish.enumerated()), id: \.offset) { _, step in
                 bannerRow(text: step, index: nil, isFinish: true)
@@ -117,21 +129,26 @@ struct RecipeDiagramView: View {
         }
     }
 
-    private func diagramDataRow(_ row: DiagramRow) -> some View {
-        HStack(spacing: 0) {
-            ForEach(row.cells) { cell in
-                switch cell.kind {
-                case .ingredient:
-                    ingredientCell(cell.node, colspan: cell.node.colspan)
-                case .operation:
-                    operationCell(cell.node)
-                }
+    private var diagramGrid: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(recipe.leaves, id: \.id) { node in
+                ingredientCell(node, colspan: node.colspan)
+                    .offset(y: CGFloat(node.row) * rowHeight)
+            }
+
+            ForEach(recipe.operations, id: \.id) { node in
+                operationCell(node)
+                    .offset(
+                        x: operationX(for: node),
+                        y: CGFloat(node.first) * rowHeight
+                    )
             }
         }
-        .frame(minWidth: tableMinWidth, alignment: .leading)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(ArtifactColors.rule).frame(height: 1)
-        }
+        .frame(
+            width: tableMinWidth,
+            height: CGFloat(recipe.leaves.count) * rowHeight,
+            alignment: .topLeading
+        )
     }
 
     private func ingredientCell(_ node: RecipeNode, colspan: Int) -> some View {
@@ -170,7 +187,11 @@ struct RecipeDiagramView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 9)
         }
-        .frame(width: ingredientWidth(for: colspan), alignment: .leading)
+        .frame(
+            width: ingredientWidth(for: colspan),
+            height: rowHeight,
+            alignment: .leading
+        )
         .background {
             if isRef {
                 refBackground
@@ -178,9 +199,7 @@ struct RecipeDiagramView: View {
                 (isHighlighted ? ArtifactColors.accentSoft : ArtifactColors.card)
             }
         }
-        .overlay(alignment: .trailing) {
-            Rectangle().fill(ArtifactColors.rule).frame(width: 1)
-        }
+        .overlay(Rectangle().stroke(ArtifactColors.rule, lineWidth: 1))
         .contentShape(Rectangle())
         .onTapGesture {
             ExilyHaptics.tap(highlightedID == node.id ? .select : .light)
@@ -228,9 +247,11 @@ struct RecipeDiagramView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 10)
-        .frame(width: columnMetrics.operation * CGFloat(max(node.colspan, 1)))
-        .frame(minHeight: CGFloat(node.span) * 52)
-        .background(isHighlighted ? ArtifactColors.accentSoft : ArtifactColors.card)
+        .frame(
+            width: columnMetrics.operation * CGFloat(max(node.colspan, 1)),
+            height: CGFloat(node.span) * rowHeight
+        )
+        .background(isHighlighted ? ArtifactColors.accentSoft : ArtifactColors.band)
         .overlay(alignment: .leading) {
             if isHighlighted {
                 Rectangle()
@@ -238,9 +259,7 @@ struct RecipeDiagramView: View {
                     .frame(width: 3)
             }
         }
-        .overlay(alignment: .trailing) {
-            Rectangle().fill(ArtifactColors.rule).frame(width: 1)
-        }
+        .overlay(Rectangle().stroke(ArtifactColors.rule, lineWidth: 1))
         .contentShape(Rectangle())
         .onTapGesture {
             ExilyHaptics.tap(highlightedID == node.id ? .select : .light)
@@ -265,6 +284,11 @@ struct RecipeDiagramView: View {
 
     private func ingredientWidth(for colspan: Int) -> CGFloat {
         columnMetrics.ingredient + columnMetrics.operation * CGFloat(max(colspan - 1, 0))
+    }
+
+    private func operationX(for node: RecipeNode) -> CGFloat {
+        columnMetrics.ingredient
+            + columnMetrics.operation * CGFloat(max(node.col - 1, 0))
     }
 
     private func isNodeHighlighted(_ node: RecipeNode) -> Bool {

@@ -84,11 +84,43 @@ struct ParsedRecipe {
     var error: String?
 }
 
+struct RecipeGenre: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let symbol: String
+
+    init(_ name: String, symbol: String) {
+        self.id = name.lowercased().replacingOccurrences(of: " ", with: "-")
+        self.name = name
+        self.symbol = symbol
+    }
+
+    static let mains = RecipeGenre("Mains", symbol: "fork.knife")
+}
+
 struct RecipeDocument: Identifiable, Hashable {
     let id: String
     let title: String
     let subtitle: String
+    let prepTime: String
+    let genre: RecipeGenre
     let source: String
+
+    init(
+        id: String,
+        title: String,
+        subtitle: String,
+        prepTime: String,
+        genre: RecipeGenre = .mains,
+        source: String
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.prepTime = prepTime
+        self.genre = genre
+        self.source = source
+    }
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: RecipeDocument, rhs: RecipeDocument) -> Bool { lhs.id == rhs.id }
