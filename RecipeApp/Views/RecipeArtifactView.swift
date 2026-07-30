@@ -12,59 +12,62 @@ struct RecipeArtifactView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 20) {
                     masthead
                     controls
                     if let error = parsed.error {
                         errorBanner(error)
                     }
-                    cardContent
+                    artifactCard
                     footerNote
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 12)
+                .padding(.top, 8)
                 .padding(.bottom, 40)
             }
-            .background(ArtifactColors.background.ignoresSafeArea())
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(ExilyColors.background.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
+                    Button { dismiss() } label: {
                         Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(ExilyColors.textPrimary)
-                            .frame(width: 34, height: 34)
+                            .frame(width: 40, height: 40)
                     }
-                    .buttonStyle(Raised3DButtonStyle(cornerRadius: 10))
+                    .buttonStyle(Raised3DButtonStyle(cornerRadius: 12, isDark: false, hapticStrength: .action))
                 }
             }
         }
     }
 
     private var masthead: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 8) {
-                    ArtifactEyebrow(text: "Recipe diagram")
-                    Text(parsed.meta.title.isEmpty ? document.title : parsed.meta.title)
-                        .font(.system(size: 29, weight: .semibold))
-                        .foregroundColor(ArtifactColors.ink)
-                        .tracking(-0.4)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    ExilyChip(text: "recipe artifact")
+                    Text((parsed.meta.title.isEmpty ? document.title : parsed.meta.title).lowercased())
+                        .font(.appFont(size: 24, weight: .bold))
+                        .foregroundColor(ExilyColors.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
-
-                    if !metaParts.isEmpty {
-                        ArtifactMetaLine(parts: metaParts)
-                    }
                 }
                 Spacer(minLength: 12)
-                ArtifactSegmentedControl(selection: $viewMode)
             }
 
-            Rectangle()
-                .fill(ArtifactColors.rule2)
-                .frame(height: 1)
+            if !metaParts.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(Array(metaParts.enumerated()), id: \.offset) { _, part in
+                        ExilyChip(text: "\(part.0.lowercased()) · \(part.1.lowercased())")
+                    }
+                }
+            }
+
+            ExilySegmentedControl(
+                selection: $viewMode,
+                options: RecipeViewMode.allCases,
+                label: { $0.rawValue }
+            )
         }
     }
 
@@ -77,20 +80,25 @@ struct RecipeArtifactView: View {
     }
 
     private var controls: some View {
-        HStack(spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("UNITS")
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .kerning(1.3)
-                    .foregroundColor(ArtifactColors.ink3)
-                ArtifactSegmentedControl(selection: $unitDisplay)
+        VStack(alignment: .leading, spacing: 10) {
+            Text("units")
+                .font(.appFont(size: 14, weight: .semibold))
+                .foregroundColor(ExilyColors.textPrimary)
+
+            ExilySegmentedControl(
+                selection: $unitDisplay,
+                options: UnitDisplay.allCases,
+                label: { $0.rawValue }
+            )
+
+            Button {} label: {
+                Text("cook this")
             }
-            Spacer()
-            ArtifactButton(title: "Cook this", style: .primary) {}
+            .buttonStyle(TactileButtonStyle(isActive: true))
         }
     }
 
-    private var cardContent: some View {
+    private var artifactCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             Group {
                 switch viewMode {
@@ -100,66 +108,42 @@ struct RecipeArtifactView: View {
                     RecipeProseView(recipe: parsed)
                 }
             }
-            .padding(22)
+            .padding(20)
         }
         .background(ArtifactColors.card)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(ArtifactColors.rule, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(ExilyColors.border, lineWidth: 1)
         )
-        .shadow(color: Color(red: 0.063, green: 0.078, blue: 0.102).opacity(0.04), radius: 2, x: 0, y: 1)
-        .shadow(color: Color(red: 0.063, green: 0.078, blue: 0.102).opacity(0.12), radius: 24, x: 0, y: 8)
+        .exilySoftShadow(radius: 8, y: 4)
     }
 
     private func errorBanner(_ message: String) -> some View {
-        HStack(alignment: .top, spacing: 11) {
+        HStack(alignment: .top, spacing: 10) {
             Text("!")
-                .font(.artifactMono(size: 12, weight: .bold))
+                .font(.appFont(size: 13, weight: .bold))
             Text(message)
-                .font(.system(size: 12.5))
+                .font(.appFont(size: 13, weight: .medium))
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .foregroundColor(Color(red: 0.541, green: 0.353, blue: 0.071))
-        .padding(11)
+        .foregroundColor(ExilyColors.textPrimary)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color(red: 0.992, green: 0.961, blue: 0.902))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color(red: 0.902, green: 0.812, blue: 0.624), lineWidth: 1)
-                )
+        .background(ExilyColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(ExilyColors.border, lineWidth: 1)
         )
     }
 
     private var footerNote: some View {
-        HStack(alignment: .top) {
-            HStack(spacing: 16) {
-                legendKey(label: "Operation", fill: ArtifactColors.band)
-                legendKey(label: "Ingredient", fill: ArtifactColors.card)
-            }
-            Spacer()
-            Text("Tap cells to trace the flow.")
-                .font(.system(size: 11.5))
-                .foregroundColor(ArtifactColors.ink3)
-        }
-        .padding(.top, 4)
-    }
-
-    private func legendKey(label: String, fill: Color) -> some View {
-        HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(fill)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .stroke(ArtifactColors.rule2, lineWidth: 1)
-                )
-                .frame(width: 15, height: 11)
-            Text(label)
-                .font(.system(size: 11.5))
-                .foregroundColor(ArtifactColors.ink3)
-        }
+        Text("tap cells to trace the flow")
+            .font(.appFont(size: 11, weight: .medium))
+            .foregroundColor(ExilyColors.textSecondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 4)
     }
 }
 

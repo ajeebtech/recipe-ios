@@ -1,12 +1,46 @@
 import SwiftUI
 
+private struct DiagramSizePreferenceKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
+private extension View {
+    func readDiagramSize(_ onChange: @escaping (CGSize) -> Void) -> some View {
+        background {
+            GeometryReader { geo in
+                Color.clear
+                    .preference(key: DiagramSizePreferenceKey.self, value: geo.size)
+            }
+        }
+        .onPreferenceChange(DiagramSizePreferenceKey.self, perform: onChange)
+    }
+}
+
 struct RecipeDiagramView: View {
     let recipe: ParsedRecipe
     var units: UnitDisplay = .both
     var scale: Double = 1
     @State private var highlightedID: String?
+    @State private var containerWidth: CGFloat = 0
+    @State private var diagramSize: CGSize = .zero
 
     private var rows: [DiagramRow] { RecipeParser.diagramRows(from: recipe) }
+
+    private var fitScale: CGFloat {
+        guard containerWidth > 0 else { return 1 }
+        return min(1, containerWidth / max(tableMinWidth, 1))
+    }
+
+    private var columnMetrics: (ingredient: CGFloat, operation: CGFloat) {
+        if containerWidth > 0, containerWidth < 520 {
+            return (228, 78)
+        }
+        return (ArtifactMetrics.ingredientColumnWidth, ArtifactMetrics.operationColumnWidth)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -16,23 +50,41 @@ struct RecipeDiagramView: View {
                 .kerning(0.4)
                 .padding(.bottom, 8)
 
-            ScrollView(.horizontal, showsIndicators: true) {
-                VStack(spacing: 0) {
-                    ForEach(Array(recipe.meta.prep.enumerated()), id: \.offset) { index, step in
-                        bannerRow(text: step, index: index + 1, isFinish: false)
-                    }
-
-                    ForEach(rows) { row in
-                        diagramDataRow(row)
-                    }
-
-                    ForEach(Array(recipe.meta.finish.enumerated()), id: \.offset) { _, step in
-                        bannerRow(text: step, index: nil, isFinish: true)
-                    }
-                }
-                .overlay(diagramBorder)
+            diagramTable
+                .frame(width: tableMinWidth, alignment: .leading)
+                .readDiagramSize { diagramSize = $0 }
+                .scaleEffect(fitScale, anchor: .topLeading)
+                .frame(
+                    width: containerWidth > 0 ? containerWidth : nil,
+                    height: diagramSize.height * fitScale,
+                    alignment: .topLeading
+                )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { containerWidth = geo.size.width }
+                    .onChange(of: geo.size.width) { _, width in containerWidth = width }
             }
         }
+    }
+
+    private var diagramTable: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(recipe.meta.prep.enumerated()), id: \.offset) { index, step in
+                bannerRow(text: step, index: index + 1, isFinish: false)
+            }
+
+            ForEach(rows) { row in
+                diagramDataRow(row)
+            }
+
+            ForEach(Array(recipe.meta.finish.enumerated()), id: \.offset) { _, step in
+                bannerRow(text: step, index: nil, isFinish: true)
+            }
+        }
+        .overlay(diagramBorder)
     }
 
     private var diagramBorder: some View {
@@ -130,7 +182,12 @@ struct RecipeDiagramView: View {
             Rectangle().fill(ArtifactColors.rule).frame(width: 1)
         }
         .contentShape(Rectangle())
-        .onTapGesture { highlightedID = node.id }
+        .onTapGesture {
+            ExilyHaptics.tap(highlightedID == node.id ? .select : .light)
+            withAnimation(.easeOut(duration: 0.15)) {
+                highlightedID = highlightedID == node.id ? nil : node.id
+            }
+        }
     }
 
     private func operationCell(_ node: RecipeNode) -> some View {
@@ -171,7 +228,7 @@ struct RecipeDiagramView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 10)
-        .frame(width: ArtifactMetrics.operationColumnWidth * CGFloat(max(node.colspan, 1)))
+        .frame(width: columnMetrics.operation * CGFloat(max(node.colspan, 1)))
         .frame(minHeight: CGFloat(node.span) * 52)
         .background(isHighlighted ? ArtifactColors.accentSoft : ArtifactColors.card)
         .overlay(alignment: .leading) {
@@ -185,7 +242,12 @@ struct RecipeDiagramView: View {
             Rectangle().fill(ArtifactColors.rule).frame(width: 1)
         }
         .contentShape(Rectangle())
-        .onTapGesture { highlightedID = node.id }
+        .onTapGesture {
+            ExilyHaptics.tap(highlightedID == node.id ? .select : .light)
+            withAnimation(.easeOut(duration: 0.15)) {
+                highlightedID = highlightedID == node.id ? nil : node.id
+            }
+        }
     }
 
     private var refBackground: some View {
@@ -198,11 +260,11 @@ struct RecipeDiagramView: View {
     }
 
     private var tableMinWidth: CGFloat {
-        ArtifactMetrics.ingredientColumnWidth + ArtifactMetrics.operationColumnWidth * CGFloat(max(recipe.columnCount - 1, 0))
+        columnMetrics.ingredient + columnMetrics.operation * CGFloat(max(recipe.columnCount - 1, 0))
     }
 
     private func ingredientWidth(for colspan: Int) -> CGFloat {
-        ArtifactMetrics.ingredientColumnWidth + ArtifactMetrics.operationColumnWidth * CGFloat(max(colspan - 1, 0))
+        columnMetrics.ingredient + columnMetrics.operation * CGFloat(max(colspan - 1, 0))
     }
 
     private func isNodeHighlighted(_ node: RecipeNode) -> Bool {

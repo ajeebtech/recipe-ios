@@ -96,14 +96,17 @@ struct RecipeDocument: Identifiable, Hashable {
     var parsed: ParsedRecipe { RecipeParser.parse(source) }
 }
 
-struct CuisineFolder: Identifiable {
+struct CuisineFolder: Identifiable, Hashable {
     let id: String
     let name: String
     let symbol: String
     let tint: ColorToken
     let recipes: [RecipeDocument]
 
-    struct ColorToken {
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    static func == (lhs: CuisineFolder, rhs: CuisineFolder) -> Bool { lhs.id == rhs.id }
+
+    struct ColorToken: Hashable {
         let red: Double
         let green: Double
         let blue: Double
